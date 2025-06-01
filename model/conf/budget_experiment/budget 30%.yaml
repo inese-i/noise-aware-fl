@@ -1,0 +1,32 @@
+name: budget_OortCA 30% # foldername_filename
+num_rounds: 100
+num_clients: 30
+num_clients_per_round: 10
+batch_size: 32
+dataset: cifar10_dirichlet # cifar10_iid
+alpha: 10 # for dirichlet
+
+# client config:
+config_fit:
+  lr: 0.001
+  local_epochs: 2
+  weight_decay: # default = 0
+
+# server config:
+selection_strategy: carbon_oort # carbon_oort, oort else random
+probing_round: True
+threshold_coeff: 0.0001
+carbon_intensities: True
+add_curtailment_data: True
+carbon_budget: True
+total_carbon_budget: 60000
+experiments:
+  # corrupted clients
+  start_round:
+  until_round:
+  data_damage:
+  noise_std:
+  num_defect_clients:
+
+
+
