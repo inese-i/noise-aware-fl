@@ -4,6 +4,7 @@ import numpy as np
 import flwr as fl
 import torch.nn.functional as F
 import torch
+from datasets import preview_cifar10, preview_mnist
 
 class FlowerClient(fl.client.NumPyClient):
     def __init__(self, net, device, trainloader, valloader, cid, trainloader2=None):
@@ -32,8 +33,12 @@ class FlowerClient(fl.client.NumPyClient):
         if self.trainloader2 and config.get("start_round") <= server_round <= config.get("end_round"):
             self.trainloader = self.trainloader2
 
-        """if server_round == 1 and self.client_id == 1:
-            preview_cifar10(self.trainloader)"""
+
+        # if server_round == 1 and self.client_id == 1:
+        #     preview_cifar10(self.trainloader)
+
+        # if server_round == 1 and self.client_id == 1:
+        #     preview_mnist(self.trainloader)
 
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -142,7 +147,7 @@ def test(net, device, testloader):
     criterion = torch.nn.CrossEntropyLoss()
     correct, total, loss = 0, 0, 0.0
     with torch.no_grad():
-        for images, labels in testloader:
+        for batch_idx, (images, labels) in enumerate(testloader):
             images, labels = images.to(device), labels.to(device)
             outputs = net(images)
             loss += criterion(outputs, labels).item()

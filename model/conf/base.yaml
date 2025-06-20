@@ -3,7 +3,7 @@ num_rounds: 100
 num_clients: 30
 num_clients_per_round: 10
 batch_size: 32
-dataset: cifar10_dirichlet # cifar10_iid
+dataset: cifar100_dirichlet #cifar10_dirichlet # cifar10_iid
 alpha: 10 # for dirichlet
 
 # client config:

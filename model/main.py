@@ -9,7 +9,7 @@ from hydra.core.hydra_config import HydraConfig
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 from datasets import get_dataloaders
-from model import Net
+from model import Net, CIFAR100Net
 from results.plot_distributions import (
     get_class_distribution, plot_class_distribution_all_clients,
 )
@@ -24,15 +24,23 @@ from fl_server import (
 )
 from selection_strategy import MySelectionStrategy
 
-def get_model():
+def get_model(dataset_name=None):
     np.random.seed(42)
-    return Net()
+    if dataset_name is not None:
+        if 'cifar100' in dataset_name:
+            return CIFAR100Net()
+        if 'cifar10' in dataset_name:
+            return Net()
+
+    return Net()  # fallback if dataset_name is None or not recognized
 
 @hydra.main(config_path="conf", config_name="base", version_base=None)
 def run_config(cfg: DictConfig):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = get_model()
+    # Select model based on dataset
+    model = get_model(cfg.dataset)
+    print(f"[DEBUG] Model created: {type(model)} for dataset: {cfg.dataset}")
 
     trainloaders, trainloaders2, valloaders, testloader = get_dataloaders(
         cfg.dataset, cfg.num_clients, cfg.batch_size, cfg.alpha,
@@ -40,9 +48,25 @@ def run_config(cfg: DictConfig):
         noise_std=cfg.experiments.noise_std
     )
 
+    # Get num_classes from DATASET_LOADERS
+    from datasets import DATASET_LOADERS
+    base_name = cfg.dataset.split('_')[0]
+    num_classes = DATASET_LOADERS[base_name]['num_classes']
+
+    # Sanity check: ensure all labels are in the correct range for this dataset
+    for cid, train_loader in enumerate(trainloaders):
+        for _, targets in train_loader:
+            for label in targets:
+                assert 0 <= label.item() < num_classes, f"Label {label.item()} out of bounds for dataset with {num_classes} classes (client {cid})"
+    
+    # Sanity check: ensure all labels are in the correct range for the test set as well
+    for _, targets in testloader:
+        for label in targets:
+            assert 0 <= label.item() < num_classes, f"[TEST] Label {label.item()} out of bounds for dataset with {num_classes} classes"
+
     class_distributions = {}
     for cid, train_loader in enumerate(trainloaders):
-        class_distributions[cid] = get_class_distribution(train_loader)
+        class_distributions[cid] = get_class_distribution(train_loader, num_classes=num_classes)
 
     #plot_class_distribution_all_clients(class_distributions, cfg.name)#
 

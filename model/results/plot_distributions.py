@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def get_class_distribution(train_loader):
+def get_class_distribution(train_loader, num_classes=10):
     """Returns class distribution for a single client"""
-    class_counts = {i: 0 for i in range(10)}
+    class_counts = {i: 0 for i in range(num_classes)}
 
     for data, target in train_loader:
         for label in target:

@@ -2,12 +2,34 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset, Dataset
 from torchvision import transforms
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import CIFAR10, CIFAR100
 import matplotlib.pyplot as plt
+
+# Dataset loader registry for easy extensibility
+DATASET_LOADERS = {
+    'cifar10': {
+        'loader': lambda train_transform, test_transform: CIFAR10("./dataset", train=True, download=True, transform=train_transform),
+        'test_loader': lambda test_transform: CIFAR10("./dataset", train=False, download=True, transform=test_transform),
+        'num_classes': 10,
+        'normalize': ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    },
+    'cifar100': {
+        'loader': lambda train_transform, test_transform: CIFAR100("./dataset", train=True, download=True, transform=train_transform),
+        'test_loader': lambda test_transform: CIFAR100("./dataset", train=False, download=True, transform=test_transform),
+        'num_classes': 100,
+        'normalize': ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    },
+    # Add new datasets here
+}
 
 def load_cifar10(train_transform, test_transform):
     trainset = CIFAR10("./dataset", train=True, download=True, transform=train_transform)
     testset = CIFAR10("./dataset", train=False, download=True, transform=test_transform)
+    return trainset, testset
+
+def load_cifar100(train_transform, test_transform):
+    trainset = CIFAR100("./dataset", train=True, download=True, transform=train_transform)
+    testset = CIFAR100("./dataset", train=False, download=True, transform=test_transform)
     return trainset, testset
 
 def distribute_indices(class_indices, num_clients, strategy='iid', dirichlet_alpha=10):
@@ -25,7 +47,7 @@ def distribute_indices(class_indices, num_clients, strategy='iid', dirichlet_alp
     elif strategy == 'dirichlet':
         # Dirichlet-based allocation with fixed seed
         np.random.seed(42)
-        for class_idx in range(10):
+        for class_idx in class_indices:
             class_data = np.array(class_indices[class_idx])
             proportions = np.random.dirichlet([dirichlet_alpha] * num_clients)
             proportions = proportions / proportions.sum()
@@ -58,50 +80,51 @@ def create_dataloaders(trainset, testset, client_indices, batch_size):
 def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_damage=None, noise_std=1, config=None):
     print(f"Loading data for dataset {dataset}, num_clients={num_clients}, batch_size={batch_size}")
 
+    # Parse base dataset name (e.g., 'cifar10' from 'cifar10_iid')
+    base_name = dataset.split('_')[0]
+    if base_name not in DATASET_LOADERS:
+        raise NotImplementedError(f"Dataset '{base_name}' not implemented")
+    ds_info = DATASET_LOADERS[base_name]
+    mean, std = ds_info['normalize']
+
+    # Set up transforms
     train_transform_original = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize(mean, std),
     ])
-
     train_transform_damaged = None
-    # Define data damage transformations
     if data_damage == 'noise':
         def add_noise(img):
             img = transforms.ToTensor()(img)
             noise = torch.randn(img.size()) * noise_std
             img = img + noise
             return img.clamp(0, 1)
-
         train_transform_damaged = transforms.Compose([
             transforms.Lambda(add_noise),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            transforms.Normalize(mean, std),
         ])
-
-    else:
-        train_transform_damaged = None
-
     test_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize(mean, std),
     ])
 
-    # Load original CIFAR-10 dataset
-    trainset_original, testset = load_cifar10(train_transform_original, test_transform)
+    # Load datasets
+    trainset_original = ds_info['loader'](train_transform_original, test_transform)
+    testset = ds_info['test_loader'](test_transform)
     trainset_damaged = None
-
-    # Apply transformations for damaged dataset
     if train_transform_damaged:
-        trainset_damaged, _ = load_cifar10(train_transform_damaged, test_transform)
+        trainset_damaged = ds_info['loader'](train_transform_damaged, test_transform)
+    num_classes = ds_info['num_classes']
 
     # Create class indices for distribution
-    class_indices = {i: [] for i in range(10)}
+    class_indices = {i: [] for i in range(num_classes)}
     for idx, (_, label) in enumerate(trainset_original):
         class_indices[label].append(idx)
 
     # Distribute indices based on the chosen strategy
-    if dataset == 'cifar10_iid':
+    if dataset.endswith('iid'):
         client_indices = distribute_indices(class_indices, num_clients, strategy='iid')
-    elif dataset == 'cifar10_dirichlet':
+    elif dataset.endswith('dirichlet'):
         client_indices = distribute_indices(class_indices, num_clients, strategy='dirichlet',
                                             dirichlet_alpha=dirichlet_alpha)
     else:
@@ -109,7 +132,6 @@ def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_d
 
     # Create dataloaders for original and damaged datasets
     trainloaders, valloaders, testloader = create_dataloaders(trainset_original, testset, client_indices, batch_size)
-
     if trainset_damaged:
         trainloaders_damaged, _, _ = create_dataloaders(trainset_damaged, testset, client_indices, batch_size)
         return trainloaders, trainloaders_damaged, valloaders, testloader
@@ -133,8 +155,13 @@ class TransformedDataset(Dataset):
 
 # Function to denormalize images for visualization
 def denormalize(image, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)):
-    mean = torch.tensor(mean).view(3, 1, 1)
-    std = torch.tensor(std).view(3, 1, 1)
+    # Determine number of channels from image or mean
+    if image.shape[0] == 1 or len(mean) == 1:
+        mean = torch.tensor(mean).view(1, 1, 1)
+        std = torch.tensor(std).view(1, 1, 1)
+    else:
+        mean = torch.tensor(mean).view(3, 1, 1)
+        std = torch.tensor(std).view(3, 1, 1)
     image = image * std + mean
     return image.clamp(0, 1)
 
