@@ -99,6 +99,13 @@ def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_d
     ds_info = DATASET_LOADERS[base_name]
     mean, std = ds_info['normalize']
 
+    # Ensure Tiny ImageNet is downloaded if needed
+    if base_name == 'tinyimagenet':
+        train_dir = './dataset/tiny-imagenet-200/train'
+        if not os.path.exists(train_dir):
+            print("[INFO] Tiny ImageNet not found. Downloading and extracting...")
+            download_tinyimagenet()
+
     # Set up transforms
     train_transform_original = transforms.Compose([
         transforms.ToTensor(),
@@ -245,6 +252,9 @@ def download_tinyimagenet(data_dir="./dataset"):
     # Create data directory if it doesn't exist
     os.makedirs(data_dir, exist_ok=True)
 
+    # Ensure the extraction directory exists before extracting
+    os.makedirs(extract_path, exist_ok=True)
+
     # Download the dataset
     if not os.path.exists(zip_path):
         print("Downloading Tiny ImageNet dataset...")
@@ -252,7 +262,7 @@ def download_tinyimagenet(data_dir="./dataset"):
         print("Download complete.")
 
     # Extract the dataset
-    if not os.path.exists(extract_path):
+    if not os.path.exists(extract_path) or not os.listdir(extract_path):
         print("Extracting Tiny ImageNet dataset...")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(data_dir)
@@ -294,9 +304,6 @@ def reorganize_tinyimagenet(data_dir="./dataset/tiny-imagenet"):
         shutil.rmtree(val_images_dir)
         os.remove(val_annotations_file)
         print("Validation set reorganized.")
-
-    # Debug: List contents of train directory
-    print(f"[DEBUG] Contents of train directory: {os.listdir(train_dir)}")
 
 def load_tiny_imagenet(num_clients: int, batch_size: int, beta: float):
     """Load Tiny ImageNet dataset with optional IID or non-IID partitioning."""
