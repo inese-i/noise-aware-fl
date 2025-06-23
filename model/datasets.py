@@ -2,9 +2,14 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset, Dataset
 from torchvision import transforms
-from torchvision.datasets import CIFAR10, CIFAR100
+from torchvision.datasets import CIFAR10, CIFAR100, ImageFolder
 import matplotlib.pyplot as plt
 import torchvision
+import urllib.request
+import zipfile
+import os
+from torch.utils.data import SubsetRandomSampler, random_split
+import shutil
 
 # Dataset loader registry for easy extensibility
 DATASET_LOADERS = {
@@ -19,6 +24,12 @@ DATASET_LOADERS = {
         'test_loader': lambda test_transform: CIFAR100("./dataset", train=False, download=True, transform=test_transform),
         'num_classes': 100,
         'normalize': ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    },
+    'tinyimagenet': {
+        'loader': lambda train_transform, test_transform: ImageFolder("./dataset/tiny-imagenet-200/train", transform=train_transform),
+        'test_loader': lambda test_transform: ImageFolder("./dataset/tiny-imagenet-200/val", transform=test_transform),
+        'num_classes': 200,
+        'normalize': ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     },
     # Add new datasets here
 }
@@ -212,6 +223,175 @@ def preview_cifar100(trainloader, trainloader2):
     plt.tight_layout()
     plt.show()
 
+def preview_tiny_imagenet(dataloader):
+    """Preview Tiny ImageNet dataset samples."""
+    # Get a batch of images
+    dataiter = iter(dataloader)
+    images, labels = next(dataiter)
+
+    # Display images
+    img = torchvision.utils.make_grid(images)
+    img = img / 2 + 0.5  # unnormalize
+    npimg = img.numpy()
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.title("Tiny ImageNet Preview")
+    plt.show()
+
+def download_tinyimagenet(data_dir="./dataset"):
+    url = "http://cs231n.stanford.edu/tiny-imagenet-200.zip"
+    zip_path = f"{data_dir}/tiny-imagenet-200.zip"
+    extract_path = f"{data_dir}/tiny-imagenet-200"
+
+    # Create data directory if it doesn't exist
+    os.makedirs(data_dir, exist_ok=True)
+
+    # Download the dataset
+    if not os.path.exists(zip_path):
+        print("Downloading Tiny ImageNet dataset...")
+        urllib.request.urlretrieve(url, zip_path)
+        print("Download complete.")
+
+    # Extract the dataset
+    if not os.path.exists(extract_path):
+        print("Extracting Tiny ImageNet dataset...")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(data_dir)
+        print("Extraction complete.")
+
+    # Reorganize the dataset
+    reorganize_tinyimagenet(extract_path)
+
+def reorganize_tinyimagenet(data_dir="./dataset/tiny-imagenet"):
+    """Reorganize Tiny ImageNet dataset to match ImageFolder structure."""
+    train_dir = os.path.join(data_dir, "train")
+    val_dir = os.path.join(data_dir, "val")
+
+    # Debug: Check if train directory exists
+    if not os.path.exists(train_dir):
+        print(f"[DEBUG] Train directory not found at {train_dir}. Please check the dataset.")
+        raise FileNotFoundError(f"Train directory not found at {train_dir}")
+    else:
+        print(f"[DEBUG] Train directory found at {train_dir}.")
+
+    # Reorganize validation set
+    val_images_dir = os.path.join(val_dir, "images")
+    val_annotations_file = os.path.join(val_dir, "val_annotations.txt")
+
+    if os.path.exists(val_images_dir) and os.path.exists(val_annotations_file):
+        print("Reorganizing validation set...")
+        with open(val_annotations_file, "r") as f:
+            annotations = f.readlines()
+
+        for line in annotations:
+            parts = line.strip().split("\t")
+            image_name, class_name = parts[0], parts[1]
+            class_dir = os.path.join(val_dir, class_name)
+            if not os.path.exists(class_dir):
+                os.makedirs(class_dir)
+            shutil.move(os.path.join(val_images_dir, image_name), os.path.join(class_dir, image_name))
+
+        # Remove the now-empty images directory and annotations file
+        shutil.rmtree(val_images_dir)
+        os.remove(val_annotations_file)
+        print("Validation set reorganized.")
+
+    # Debug: List contents of train directory
+    print(f"[DEBUG] Contents of train directory: {os.listdir(train_dir)}")
+
+def load_tiny_imagenet(num_clients: int, batch_size: int, beta: float):
+    """Load Tiny ImageNet dataset with optional IID or non-IID partitioning."""
+    if not os.path.exists('data/tiny-imagenet-200/'):
+        download_and_unzip_tiny_imagenet()
+
+    # Data Transformations
+    train_transform = transforms.Compose([
+        transforms.RandomCrop(64, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    ])
+    test_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    ])
+
+    # Data and Creating Train/Test Split
+    trainset = torchvision.datasets.ImageFolder(
+        root='data/tiny-imagenet-200/train',
+        transform=train_transform
+    )
+    testset = torchvision.datasets.ImageFolder(
+        root='data/tiny-imagenet-200/val',
+        transform=test_transform
+    )
+
+    trainloaders = []
+    if 0.0 < beta < 1.0:
+        client_to_data_ids = _get_niid_client_data_ids(trainset, num_clients, beta)
+        for client_id in client_to_data_ids:
+            tmp_client_img_ids = client_to_data_ids[client_id]
+            tmp_train_sampler = SubsetRandomSampler(tmp_client_img_ids)
+            _append_to_dataloaders(trainset, batch_size, trainloaders, tmp_train_sampler)
+    else:
+        partition_size = len(trainset) // num_clients
+        lengths = [partition_size] * num_clients
+        datasets = random_split(trainset, lengths, torch.Generator().manual_seed(42))
+        for dataset in datasets:
+            _append_to_dataloaders(dataset, batch_size, trainloaders)
+
+    testloader = DataLoader(testset, batch_size=batch_size, shuffle=False)
+    num_classes = len(np.unique(testset.targets))
+    return trainloaders, testloader, num_classes
+
+# Helper functions for non-IID partitioning and dataloader creation
+def _get_niid_client_data_ids(trainset, num_clients, beta):
+    """Generate non-IID client data indices using Dirichlet distribution."""
+    class_indices = {i: [] for i in range(len(trainset.classes))}
+    for idx, (_, label) in enumerate(trainset):
+        class_indices[label].append(idx)
+
+    client_to_data_ids = {i: [] for i in range(num_clients)}
+    for class_id, indices in class_indices.items():
+        np.random.shuffle(indices)
+        proportions = np.random.dirichlet([beta] * num_clients)
+        proportions = (proportions * len(indices)).astype(int)
+        start_idx = 0
+        for client_id, count in enumerate(proportions):
+            client_to_data_ids[client_id].extend(indices[start_idx:start_idx + count])
+            start_idx += count
+
+    return client_to_data_ids
+
+def _append_to_dataloaders(dataset, batch_size, dataloaders, sampler=None):
+    """Append a dataloader to the list of dataloaders."""
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler)
+    dataloaders.append(dataloader)
+
+def download_and_unzip_tiny_imagenet(data_dir="data"):
+    """Download and unzip the Tiny ImageNet dataset."""
+    url = "http://cs231n.stanford.edu/tiny-imagenet-200.zip"
+    zip_path = f"{data_dir}/tiny-imagenet-200.zip"
+    extract_path = f"{data_dir}/tiny-imagenet"
+
+    # Create data directory if it doesn't exist
+    os.makedirs(data_dir, exist_ok=True)
+
+    # Download the dataset
+    if not os.path.exists(zip_path):
+        print("Downloading Tiny ImageNet dataset...")
+        urllib.request.urlretrieve(url, zip_path)
+        print("Download complete.")
+
+    # Extract the dataset
+    if not os.path.exists(extract_path):
+        print("Extracting Tiny ImageNet dataset...")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(data_dir)
+        print("Extraction complete.")
+
+    # Reorganize the dataset
+    reorganize_tinyimagenet(extract_path)
+
 def main():
     # Commenting out CIFAR-10 preview
     # dataset = 'cifar10_dirichlet'
@@ -234,7 +414,7 @@ def main():
     # preview_cifar10(trainloaders2[0])
 
     # Adding CIFAR-100 preview with noise from two dataloaders
-    dataset = 'cifar100_dirichlet'
+    dataset = 'tinyimagenet_dirichlet'
     num_clients = 5
     batch_size = 32
     dirichlet_alpha = 0.5
@@ -250,8 +430,11 @@ def main():
         noise_std=noise_std
     )
 
-    print("Previewing noised CIFAR-100 images from original loader...")
-    preview_cifar100(trainloaders[0], trainloaders2[0])
+    #print("Previewing noised CIFAR-100 images from original loader...")
+    #preview_cifar100(trainloaders[0], trainloaders2[0])
+
+    print("Previewing Tiny ImageNet...")
+    preview_tiny_imagenet(trainloaders2[0])
 
 if __name__ == "__main__":
     main()

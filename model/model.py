@@ -53,3 +53,13 @@ def get_densenet121():
     
     return model
 
+def get_efficientnet_b1():
+    # Load the pre-trained EfficientNet-B1 model
+    model = models.efficientnet_b1(pretrained=True)
+
+    # Modify the classifier for Tiny ImageNet (200 classes)
+    num_features = model.classifier[1].in_features
+    model.classifier[1] = nn.Linear(num_features, 200)
+
+    return model
+

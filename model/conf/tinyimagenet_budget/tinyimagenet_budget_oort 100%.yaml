@@ -1,9 +1,9 @@
-name: test_Oort 100% # foldername_filename
+name: tinyimagenetbudget_Oort 100% # foldername_filename
 num_rounds: 100
 num_clients: 30
 num_clients_per_round: 10
 batch_size: 32
-dataset: tinyimagenet_dirichlet # cifar10_iid
+dataset: tinyimagenet_dirichlet
 alpha: 10 # for dirichlet
 
 # client config:

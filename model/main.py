@@ -9,7 +9,7 @@ from hydra.core.hydra_config import HydraConfig
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 from datasets import get_dataloaders
-from model import Net, CIFAR100Net, get_densenet121
+from model import Net, CIFAR100Net, get_densenet121, get_efficientnet_b1
 from results.plot_distributions import (
     get_class_distribution, plot_class_distribution_all_clients,
 )
@@ -23,15 +23,19 @@ from fl_server import (
     get_evaluate_fn,
 )
 from selection_strategy import MySelectionStrategy
+from datasets import DATASET_LOADERS
 
 # Update the get_model function to use the correct function name
 def get_model(dataset_name=None):
     np.random.seed(42)
     if dataset_name is not None:
         if 'cifar100' in dataset_name:
-            return get_densenet121()  # Use DenseNet-121 for CIFAR-100
+            return CIFAR100Net()
+            #return get_densenet121()  # Use DenseNet-121 for CIFAR-100
         if 'cifar10' in dataset_name:
             return Net()
+        if 'tinyimagenet' in dataset_name:
+            return get_efficientnet_b1()  # EfficientNet-B1 for Tiny ImageNet
 
     return Net()  # fallback if dataset_name is None or not recognized
 
@@ -42,7 +46,7 @@ def run_config(cfg: DictConfig):
     # Select model based on dataset
     model = get_model(cfg.dataset)
     print(f"[DEBUG] Model created: {type(model)} for dataset: {cfg.dataset}")
-
+   
     trainloaders, trainloaders2, valloaders, testloader = get_dataloaders(
         cfg.dataset, cfg.num_clients, cfg.batch_size, cfg.alpha,
         data_damage=cfg.experiments.data_damage,
@@ -50,7 +54,6 @@ def run_config(cfg: DictConfig):
     )
 
     # Get num_classes from DATASET_LOADERS
-    from datasets import DATASET_LOADERS
     base_name = cfg.dataset.split('_')[0]
     num_classes = DATASET_LOADERS[base_name]['num_classes']
 
