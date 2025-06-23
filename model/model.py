@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torchvision import models
 
 class Net(nn.Module):
     def __init__(self) -> None:
@@ -41,4 +42,14 @@ class CIFAR100Net(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+def get_densenet121():
+    # Load the pre-trained DenseNet-121 model
+    model = models.densenet121(pretrained=True)
+    
+    # Modify the classifier for CIFAR-100 (100 classes)
+    num_features = model.classifier.in_features
+    model.classifier = nn.Linear(num_features, 100)
+    
+    return model
 

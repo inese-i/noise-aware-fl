@@ -17,3 +17,6 @@ runs/
 
 # Ignore outputs folder
 outputs/
+
+# Ignore PyCharm project files
+.idea/

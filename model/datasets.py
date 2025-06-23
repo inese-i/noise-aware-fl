@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader, Subset, Dataset
 from torchvision import transforms
 from torchvision.datasets import CIFAR10, CIFAR100
 import matplotlib.pyplot as plt
+import torchvision
 
 # Dataset loader registry for easy extensibility
 DATASET_LOADERS = {
@@ -180,13 +181,65 @@ def preview_cifar10(trainloader):
     plt.tight_layout()
     plt.show()
 
+def preview_cifar100(trainloader, trainloader2):
+    """Preview CIFAR-100 dataset samples from two dataloaders."""
+    dataiter = iter(trainloader)
+    dataiter2 = iter(trainloader2)
+    images, labels = next(dataiter)
+    images2, labels2 = next(dataiter2)
+
+    # Display images from the first dataloader
+    fig, axs = plt.subplots(5, 4, figsize=(12, 15))
+    for i, ax in enumerate(axs.flat):
+        if i < len(images):
+            img = denormalize(images[i])
+            img = transforms.ToPILImage()(img)
+            ax.imshow(img)
+            ax.set_title(f"Client {labels[i]}")
+            ax.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+    # Display images from the second dataloader
+    fig, axs = plt.subplots(5, 4, figsize=(12, 15))
+    for i, ax in enumerate(axs.flat):
+        if i < len(images2):
+            img = denormalize(images2[i])
+            img = transforms.ToPILImage()(img)
+            ax.imshow(img)
+            ax.set_title(f"Client {labels2[i]}")
+            ax.axis('off')
+    plt.tight_layout()
+    plt.show()
+
 def main():
-    dataset = 'cifar10'
+    # Commenting out CIFAR-10 preview
+    # dataset = 'cifar10_dirichlet'
+    # num_clients = 5
+    # batch_size = 32
+    # dirichlet_alpha = 0.5
+    # data_damage = "noise"  # Apply noise damage
+    # noise_std = 10  # Increase noise standard deviation for visibility
+
+    # trainloaders, trainloaders2, valloaders, testloader = get_dataloaders(
+    #     dataset=dataset,
+    #     num_clients=num_clients,
+    #     batch_size=batch_size,
+    #     dirichlet_alpha=dirichlet_alpha,
+    #     data_damage=data_damage,
+    #     noise_std=noise_std
+    # )
+
+    # print("Previewing noised CIFAR-10 images...")
+    # preview_cifar10(trainloaders2[0])
+
+    # Adding CIFAR-100 preview with noise from two dataloaders
+    dataset = 'cifar100_dirichlet'
     num_clients = 5
     batch_size = 32
     dirichlet_alpha = 0.5
-    data_damage = 'noise'
-    noise_std = 0.1
+    data_damage = "noise"  # Apply noise damage
+    noise_std = 0.5  # Increase noise standard deviation for visibility
 
     trainloaders, trainloaders2, valloaders, testloader = get_dataloaders(
         dataset=dataset,
@@ -196,9 +249,11 @@ def main():
         data_damage=data_damage,
         noise_std=noise_std
     )
-    preview_cifar10(trainloaders[0])
-    if trainloaders2 is not None:
-        print("Previewing images from the damaged probing loader (first client)")
-        preview_cifar10(trainloaders2[0])
+
+    print("Previewing noised CIFAR-100 images from original loader...")
+    preview_cifar100(trainloaders[0], trainloaders2[0])
+
+if __name__ == "__main__":
+    main()
 
 

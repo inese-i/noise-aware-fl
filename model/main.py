@@ -9,7 +9,7 @@ from hydra.core.hydra_config import HydraConfig
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 from datasets import get_dataloaders
-from model import Net, CIFAR100Net
+from model import Net, CIFAR100Net, get_densenet121
 from results.plot_distributions import (
     get_class_distribution, plot_class_distribution_all_clients,
 )
@@ -24,11 +24,12 @@ from fl_server import (
 )
 from selection_strategy import MySelectionStrategy
 
+# Update the get_model function to use the correct function name
 def get_model(dataset_name=None):
     np.random.seed(42)
     if dataset_name is not None:
         if 'cifar100' in dataset_name:
-            return CIFAR100Net()
+            return get_densenet121()  # Use DenseNet-121 for CIFAR-100
         if 'cifar10' in dataset_name:
             return Net()
 

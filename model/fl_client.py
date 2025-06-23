@@ -4,7 +4,7 @@ import numpy as np
 import flwr as fl
 import torch.nn.functional as F
 import torch
-from datasets import preview_cifar10, preview_mnist
+from datasets import preview_cifar10
 
 class FlowerClient(fl.client.NumPyClient):
     def __init__(self, net, device, trainloader, valloader, cid, trainloader2=None):

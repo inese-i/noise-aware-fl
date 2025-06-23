@@ -1,4 +1,4 @@
-name: cifar100budget_Oort 100% # foldername_filename
+name: cifar100budget_OortCA 40% # foldername_filename
 num_rounds: 100
 num_clients: 30
 num_clients_per_round: 10
@@ -19,7 +19,7 @@ threshold_coeff: 0.0001
 carbon_intensities: True
 add_curtailment_data: True
 carbon_budget: True
-total_carbon_budget: 50000000000000000000000
+total_carbon_budget: 80000
 experiments:
   # corrupted clients
   start_round:
