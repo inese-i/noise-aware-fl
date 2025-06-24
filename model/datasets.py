@@ -10,6 +10,7 @@ import zipfile
 import os
 from torch.utils.data import SubsetRandomSampler, random_split
 import shutil
+import random  # Ensure the random module is imported
 
 # Dataset loader registry for easy extensibility
 DATASET_LOADERS = {
@@ -46,11 +47,13 @@ def load_cifar100(train_transform, test_transform):
 
 def distribute_indices(class_indices, num_clients, strategy='iid', dirichlet_alpha=10):
     client_indices = [[] for _ in range(num_clients)]
+    np.random.seed(42)  # Set a fixed random seed for reproducibility
+
     if strategy == 'iid':
         # Equal samples per class per client
         images_per_class_per_client = min(len(indices) for indices in class_indices.values()) // num_clients
-        for class_idx in class_indices:
-            np.random.shuffle(class_indices[class_idx])
+        for class_idx in sorted(class_indices.keys()):  # Sort class indices for consistency
+            class_indices[class_idx].sort()  # Sort data indices for deterministic order
             for i in range(num_clients):
                 start_idx = i * images_per_class_per_client
                 end_idx = start_idx + images_per_class_per_client
@@ -58,19 +61,22 @@ def distribute_indices(class_indices, num_clients, strategy='iid', dirichlet_alp
 
     elif strategy == 'dirichlet':
         # Dirichlet-based allocation with fixed seed
-        np.random.seed(42)
-        for class_idx in class_indices:
-            class_data = np.array(class_indices[class_idx])
+        for class_idx in sorted(class_indices.keys()):  # Sort class indices for consistency
+            class_data = np.array(sorted(class_indices[class_idx]))  # Sort data indices for deterministic order
             proportions = np.random.dirichlet([dirichlet_alpha] * num_clients)
             proportions = proportions / proportions.sum()
             client_class_counts = (proportions * len(class_data)).astype(int)
-            np.random.shuffle(class_data)
             idx = 0
             for client_id, count in enumerate(client_class_counts):
                 client_indices[client_id].extend(class_data[idx:idx + count])
                 idx += count
     else:
         raise ValueError(f"Unknown strategy: {strategy}")
+
+    # Debug: Print the number of samples per client
+    for i, indices in enumerate(client_indices):
+        print(f"[DEBUG] Client {i} has {len(indices)} samples.")
+
     return client_indices
 
 def create_dataloaders(trainset, testset, client_indices, batch_size):
@@ -80,13 +86,13 @@ def create_dataloaders(trainset, testset, client_indices, batch_size):
 
     for indices in client_indices:
         train_subset = Subset(trainset, indices)
-        trainloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        trainloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)  # Enable shuffling after splitting
         trainloaders.append(trainloader)
 
-        valloader = DataLoader(valset, batch_size=batch_size, shuffle=False)
+        valloader = DataLoader(valset, batch_size=batch_size, shuffle=False)  # Keep validation set deterministic
         valloaders.append(valloader)
 
-    testloader = DataLoader(testset, batch_size=batch_size, shuffle=False)
+    testloader = DataLoader(testset, batch_size=batch_size, shuffle=False)  # Keep test set deterministic
     return trainloaders, valloaders, testloader
 
 def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_damage=None, noise_std=1, config=None):
@@ -188,7 +194,7 @@ def preview_cifar10(trainloader):
     images, labels = next(iter(trainloader))
     CLASSES = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                'dog', 'frog', 'horse', 'ship', 'truck']
-    fig, axs = plt.subplots(5, 4, figsize=(12, 15))
+    fig, axs = plt.subplots(2, 5, figsize=(12, 6))  # Adjusted to show only the first 10 samples
     for i, ax in enumerate(axs.flat):
         if i < len(images):
             img = denormalize(images[i])
@@ -399,6 +405,16 @@ def download_and_unzip_tiny_imagenet(data_dir="data"):
     # Reorganize the dataset
     reorganize_tinyimagenet(extract_path)
 
+def set_random_seed(seed):
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
 def main():
     # Commenting out CIFAR-10 preview
     # dataset = 'cifar10_dirichlet'
@@ -444,6 +460,6 @@ def main():
     preview_tiny_imagenet(trainloaders2[0])
 
 if __name__ == "__main__":
+    set_random_seed(42)
     main()
-
 
