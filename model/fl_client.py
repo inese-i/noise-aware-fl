@@ -4,7 +4,7 @@ import numpy as np
 import flwr as fl
 import torch.nn.functional as F
 import torch
-from datasets import preview_cifar10
+from datasets import preview_cifar10, preview_tiny_imagenet
 
 class FlowerClient(fl.client.NumPyClient):
     def __init__(self, net, device, trainloader, valloader, cid, trainloader2=None):
@@ -39,6 +39,9 @@ class FlowerClient(fl.client.NumPyClient):
 
         # if server_round == 1 and self.client_id == 1:
         #     preview_mnist(self.trainloader)
+
+        # if server_round == 1 and self.client_id == 1:
+        #     preview_tiny_imagenet(self.trainloader)
 
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=weight_decay)
 
