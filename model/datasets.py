@@ -97,6 +97,7 @@ def create_dataloaders(trainset, testset, client_indices, batch_size):
 
 def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_damage=None, noise_std=1, config=None):
     print(f"Loading data for dataset {dataset}, num_clients={num_clients}, batch_size={batch_size}")
+    print(f"[DEBUG] data_damage={data_damage}, noise_std={noise_std}")
 
     # Parse base dataset name (e.g., 'cifar10' from 'cifar10_iid')
     base_name = dataset.split('_')[0]
@@ -119,6 +120,7 @@ def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_d
     ])
     train_transform_damaged = None
     if data_damage == 'noise':
+        print(f"[DEBUG] Applying noise with std={noise_std}")
         def add_noise(img):
             img = transforms.ToTensor()(img)
             noise = torch.randn(img.size()) * noise_std
@@ -128,6 +130,8 @@ def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_d
             transforms.Lambda(add_noise),
             transforms.Normalize(mean, std),
         ])
+    else:
+        print(f"[DEBUG] No noise applied. data_damage='{data_damage}'")
     test_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
@@ -138,7 +142,10 @@ def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_d
     testset = ds_info['test_loader'](test_transform)
     trainset_damaged = None
     if train_transform_damaged:
+        print(f"[DEBUG] Creating damaged dataset for {base_name}")
         trainset_damaged = ds_info['loader'](train_transform_damaged, test_transform)
+    else:
+        print(f"[DEBUG] No damaged dataset created")
     num_classes = ds_info['num_classes']
 
     # Create class indices for distribution
@@ -242,9 +249,15 @@ def preview_tiny_imagenet(dataloader):
     dataiter = iter(dataloader)
     images, labels = next(dataiter)
 
-    # Display images
+    # Display images with proper unnormalization for TinyImageNet (ImageNet normalization)
     img = torchvision.utils.make_grid(images)
-    img = img / 2 + 0.5  # unnormalize
+    
+    # Unnormalize using ImageNet stats: mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+    img = img * std + mean  # unnormalize
+    img = torch.clamp(img, 0, 1)  # clamp values to [0, 1]
+    
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.title("Tiny ImageNet Preview")
@@ -442,7 +455,7 @@ def main():
     batch_size = 32
     dirichlet_alpha = 0.5
     data_damage = "noise"  # Apply noise damage
-    noise_std = 0.5  # Increase noise standard deviation for visibility
+    noise_std = 1  # Increase noise standard deviation for visibility
 
     trainloaders, trainloaders2, valloaders, testloader = get_dataloaders(
         dataset=dataset,
