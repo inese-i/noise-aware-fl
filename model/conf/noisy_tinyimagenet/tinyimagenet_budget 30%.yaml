@@ -1,5 +1,5 @@
-name: test_OortCA 30% # foldername_filename
-num_rounds: 2
+name: noisetinyim_OortCA 30% # foldername_filename
+num_rounds: 100
 num_clients: 30
 num_clients_per_round: 10
 batch_size: 32
@@ -23,7 +23,7 @@ total_carbon_budget: 60000
 experiments:
   # corrupted clients
   start_round: 0
-  until_round: 2
+  until_round: 100
   data_damage: noise
   noise_std: 1
   num_defect_clients: 6
