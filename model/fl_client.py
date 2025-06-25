@@ -27,7 +27,13 @@ class FlowerClient(fl.client.NumPyClient):
         self.set_parameters(parameters)
         server_round = int(config.get("server_round"))
         lr = config.get("lr", 0.001)
-        local_epochs = config.get("local_epochs", 1) if config.get("local_epochs") is not None else 1
+        
+        
+        if server_round == 1:
+            local_epochs = 2
+        else:
+            local_epochs = config.get("local_epochs", 1) if config.get("local_epochs") is not None else 1
+            
         weight_decay = config.get("weight_decay", 0) if config.get("weight_decay") is not None else 0
 
         if self.trainloader2 and config.get("start_round") <= server_round <= config.get("end_round"):
