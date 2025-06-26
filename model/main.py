@@ -30,8 +30,8 @@ def get_model(dataset_name=None):
     np.random.seed(42)
     if dataset_name is not None:
         if 'cifar100' in dataset_name:
-            return CIFAR100Net()
-            #return get_densenet121()  # Use DenseNet-121 for CIFAR-100
+            #return CIFAR100Net()
+            return get_densenet121() 
         if 'cifar10' in dataset_name:
             return Net()
         if 'tinyimagenet' in dataset_name:
@@ -60,6 +60,7 @@ def run_config(cfg: DictConfig):
     # Sanity check: ensure all labels are in the correct range for this dataset
     for cid, train_loader in enumerate(trainloaders):
         for _, targets in train_loader:
+
             for label in targets:
                 assert 0 <= label.item() < num_classes, f"Label {label.item()} out of bounds for dataset with {num_classes} classes (client {cid})"
     
