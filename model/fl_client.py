@@ -28,9 +28,9 @@ class FlowerClient(fl.client.NumPyClient):
         server_round = int(config.get("server_round"))
         lr = config.get("lr", 0.001)
         
-        
+
         if server_round == 1:
-            local_epochs = 2
+            local_epochs = 3
         else:
             local_epochs = config.get("local_epochs", 1) if config.get("local_epochs") is not None else 1
             
