@@ -30,8 +30,7 @@ def get_model(dataset_name=None):
     np.random.seed(42)
     if dataset_name is not None:
         if 'cifar100' in dataset_name:
-            return CIFAR100Net()
-            #return get_densenet121()  # Use DenseNet-121 for CIFAR-100
+            return get_densenet121()  # Use DenseNet-121 for CIFAR-100
         if 'cifar10' in dataset_name:
             return Net()
         if 'tinyimagenet' in dataset_name:
