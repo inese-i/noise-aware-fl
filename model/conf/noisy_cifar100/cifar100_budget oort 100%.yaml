@@ -1,0 +1,31 @@
+name: nnoisecifar100_Oort 100% # foldername_filename
+num_rounds: 100
+num_clients: 30
+num_clients_per_round: 10
+batch_size: 32
+dataset: cifar100_dirichlet # cifar100_iid
+alpha: 10 # for dirichlet
+
+# client config:
+config_fit:
+  lr: 0.001
+  local_epochs: 1
+  weight_decay: # default = 0
+
+# server config:
+selection_strategy: oort # carbon_oort, oort else random
+probing_round:
+threshold_coeff:
+carbon_intensities: True
+add_curtailment_data: True
+carbon_budget: True
+total_carbon_budget: 50000000000000000000000
+experiments:
+  # corrupted clients
+  start_round: 0
+  until_round: 100
+  data_damage: noise
+  noise_std: 1
+  num_defect_clients: 6
+
+
