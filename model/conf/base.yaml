@@ -1,4 +1,4 @@
-name: tinyimagenetbudget_OortCA 30% # foldername_filename
+name: tinyimagenetbudget_OortCA 0% # foldername_filename
 num_rounds: 50
 num_clients: 30
 num_clients_per_round: 10
@@ -19,7 +19,7 @@ threshold_coeff: 0.0001
 carbon_intensities: True
 add_curtailment_data: True
 carbon_budget: True
-total_carbon_budget: 60000
+total_carbon_budget: 0
 experiments:
   # corrupted clients
   start_round:
