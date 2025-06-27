@@ -97,7 +97,6 @@ def create_dataloaders(trainset, testset, client_indices, batch_size):
 
 def get_dataloaders(dataset, num_clients, batch_size, dirichlet_alpha=10, data_damage=None, noise_std=1, config=None):
     print(f"Loading data for dataset {dataset}, num_clients={num_clients}, batch_size={batch_size}")
-    print(f"[DEBUG] data_damage={data_damage}, noise_std={noise_std}")
 
     # Parse base dataset name (e.g., 'cifar10' from 'cifar10_iid')
     base_name = dataset.split('_')[0]
@@ -212,33 +211,36 @@ def preview_cifar10(trainloader):
     plt.tight_layout()
     plt.show()
 
-def preview_cifar100(trainloader, trainloader2):
-    """Preview CIFAR-100 dataset samples from two dataloaders."""
-    dataiter = iter(trainloader)
-    dataiter2 = iter(trainloader2)
-    images, labels = next(dataiter)
-    images2, labels2 = next(dataiter2)
-
-    # Display images from the first dataloader
-    fig, axs = plt.subplots(5, 4, figsize=(12, 15))
+def preview_cifar100(trainloader):
+    """Preview CIFAR-100 dataset samples."""
+    images, labels = next(iter(trainloader))
+    
+    # CIFAR-100 class names (100 classes)
+    CLASSES = [
+        'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 
+        'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel', 
+        'can', 'castle', 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock', 
+        'cloud', 'cockroach', 'couch', 'crab', 'crocodile', 'cup', 'dinosaur', 
+        'dolphin', 'elephant', 'flatfish', 'forest', 'fox', 'girl', 'hamster', 
+        'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion',
+        'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse',
+        'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear',
+        'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine',
+        'possum', 'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose',
+        'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake',
+        'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table',
+        'tank', 'telephone', 'television', 'tiger', 'tractor', 'train', 'trout',
+        'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman',
+        'worm'
+    ]
+    
+    fig, axs = plt.subplots(2, 5, figsize=(12, 6))  # Show first 10 samples like CIFAR-10
     for i, ax in enumerate(axs.flat):
         if i < len(images):
             img = denormalize(images[i])
             img = transforms.ToPILImage()(img)
             ax.imshow(img)
-            ax.set_title(f"Client {labels[i]}")
-            ax.axis('off')
-    plt.tight_layout()
-    plt.show()
-
-    # Display images from the second dataloader
-    fig, axs = plt.subplots(5, 4, figsize=(12, 15))
-    for i, ax in enumerate(axs.flat):
-        if i < len(images2):
-            img = denormalize(images2[i])
-            img = transforms.ToPILImage()(img)
-            ax.imshow(img)
-            ax.set_title(f"Client {labels2[i]}")
+            ax.set_title(CLASSES[labels[i]])
             ax.axis('off')
     plt.tight_layout()
     plt.show()
