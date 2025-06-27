@@ -1,4 +1,4 @@
-name: noisetinyim_Oort 100% # foldername_filename
+name: tinyimagenetbudget_OortCA 30% # foldername_filename
 num_rounds: 50
 num_clients: 30
 num_clients_per_round: 10
@@ -13,18 +13,17 @@ config_fit:
   weight_decay: # default = 0
 
 # server config:
-selection_strategy: oort # carbon_oort, oort else random
-probing_round: 
-threshold_coeff: 
+selection_strategy: carbon_oort # carbon_oort, oort else random
+probing_round: True
+threshold_coeff: 0.0001
 carbon_intensities: True
 add_curtailment_data: True
 carbon_budget: True
-total_carbon_budget: 5000000000000
+total_carbon_budget: 60000
 experiments:
   # corrupted clients
-  start_round: 0
-  until_round: 100
-  data_damage: noise
-  noise_std: 1
-  num_defect_clients: 6
-
+  start_round:
+  until_round:
+  data_damage:
+  noise_std:
+  num_defect_clients:

@@ -21,7 +21,7 @@ class SelectionStrategy(ABC):
         """Choose clients and set as next sample in Client Manager"""
 
     def get_probing_threshold(self):
-        probing_metric = 'loss_utility' #'avg_grad'
+        probing_metric = 'avg_grad' # 'loss_utility' #'avg_grad'
 
         if probing_metric not in self.clients_measurements.dtype.names:
             raise ValueError(f"[ERROR] Probing metric '{probing_metric}' not found in clients_measurements!")
@@ -41,7 +41,7 @@ class SelectionStrategy(ABC):
             print(f"[DEBUG] Gradient threshold: {self.metric_threshold}")
 
     def update_blacklist(self):
-        probing_metric = 'loss_utility' # 'avg_grad'
+        probing_metric = 'avg_grad'
 
         if probing_metric not in self.clients_measurements.dtype.names:
             raise ValueError(f"[ERROR] Probing metric '{probing_metric}' not found in clients_measurements!")
