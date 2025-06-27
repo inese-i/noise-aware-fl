@@ -1,5 +1,5 @@
 name: noisetinyim_OortCA 0% # foldername_filename
-num_rounds: 100
+num_rounds: 50
 num_clients: 30
 num_clients_per_round: 10
 batch_size: 32

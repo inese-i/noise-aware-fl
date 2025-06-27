@@ -45,6 +45,24 @@ def simplify_label(label):
             return "Random 30%"
         else:
             return "Random"
+    elif "oortcawt" in label or "oortwt" in label:
+        if "100%" in label:
+            return "OortCAWT"
+        elif "30%" in label:
+            return "OortCAWT 30%"
+        elif "0%" in label:
+            return "OortCAWT 0%"
+        else:
+            return "OortCAWT"
+    elif "oortca" in label:
+        if "100%" in label:
+            return "OortCA"
+        elif "30%" in label:
+            return "OortCA 30%"
+        elif "0%" in label:
+            return "OortCA 0%"
+        else:
+            return "OortCA"
     elif "oort" in label:
         if "100%" in label:
             return "Oort"
@@ -68,16 +86,24 @@ def get_method_and_budget(file_path):
         # For files like cifar100budget_Oort 100%.pkl, extract the method part
         if "cifar100budget_" in base_name:
             base_name = base_name.replace("cifar100budget_", "")
+        # For files like nnoisecifar100_OortWT 30%.pkl, extract the method part
+        elif "nnoisecifar100_" in base_name:
+            base_name = base_name.replace("nnoisecifar100_", "")
     
     return base_name
 
-def plot_carbon_and_final_accuracy(carbon_files, budget_files, ax, collected_lines, collected_labels):
+def plot_carbon_and_final_accuracy(carbon_files, budget_files, ax, collected_lines, collected_labels, show_xlabel=True, custom_ylim=None, custom_yticks=None):
     """Plot carbon emissions as bars with final accuracy as dotted line"""
+    # Use same colors as plot_budgets.py
     custom_colors = {
-        "Oort": "#E69F00",
-        "OortCA 30%": "#56B4E9", 
+        "Oort": "gray",  # Oort 100% should always be gray
+        "OortCA": "#E69F00",  # Match plot_budgets.py
+        "OortCA 30%": "#E69F00",  
         "OortCA 0%": "#009E73",
-        "Random": "black"
+        "OortCAWT": "cornflowerblue",  # Match plot_budgets.py
+        "OortCAWT 30%": "cornflowerblue",
+        "OortCAWT 0%": "cornflowerblue",
+        "Random": "gray"  # Changed from "black" to "gray" to match plot_budgets.py
     }
     
     # Process carbon files
@@ -96,6 +122,7 @@ def plot_carbon_and_final_accuracy(carbon_files, budget_files, ax, collected_lin
             base_label = get_method_and_budget(file_path)
             display_label = simplify_label(base_label)
             carbon_data[display_label] = emission_value
+            print(f"DEBUG Carbon: {file_path} -> base: '{base_label}' -> display: '{display_label}'")
             
         except Exception as e:
             print(f"Carbon file {file_path}: {e}. Skipping...")
@@ -125,21 +152,51 @@ def plot_carbon_and_final_accuracy(carbon_files, budget_files, ax, collected_lin
     final_accuracies = []
     colors = []
     
-    # Sort methods to ensure consistent ordering
-    sorted_methods = sorted(set(carbon_data.keys()) & set(accuracy_data.keys()))
+    # For emissions bars: include all methods that have carbon data
+    # For accuracy line: only include methods that have both carbon and accuracy data (and are not 100%)
+    all_carbon_methods = set(carbon_data.keys())
+    accuracy_methods = set(carbon_data.keys()) & set(accuracy_data.keys())
+    
+    # Define custom ordering: 0% first, then 100%
+    def get_method_order(method):
+        if "0%" in method:
+            return (0, method)  # 0% methods come first
+        elif "100%" in method or method in ["Oort", "OortCA", "OortCAWT"]:
+            return (2, method)  # 100% methods come last
+        else:
+            return (1, method)  # Other methods (like 30%) in between
+    
+    # Sort all carbon methods for the bars
+    sorted_methods = sorted(all_carbon_methods, key=get_method_order)
+    
+    # Collect all methods for emissions bars
+    all_methods_for_bars = []
+    all_emissions = []
+    all_colors = []
+    
+    # Collect only non-100% methods for accuracy line
+    methods_for_accuracy = []
+    accuracies_for_line = []
     
     for method in sorted_methods:
-        methods.append(method)
-        emissions.append(carbon_data[method])
-        final_accuracies.append(accuracy_data[method])
-        colors.append(custom_colors.get(method, "#333333"))
+        # Add all methods to emissions bars (as long as they have carbon data)
+        all_methods_for_bars.append(method)
+        all_emissions.append(carbon_data[method])
+        all_colors.append(custom_colors.get(method, "#333333"))
+        
+        # Only add methods to accuracy line if they have both carbon and accuracy data AND are not 100%
+        if (method in accuracy_data and 
+            not ("100%" in method or method in ["Oort", "OortCA", "OortCAWT"])):
+            methods_for_accuracy.append(method)
+            accuracies_for_line.append(accuracy_data[method])
     
-    if methods and emissions:
+    if all_methods_for_bars and all_emissions:
         # Create secondary y-axis for carbon emissions (on the right)
         ax2 = ax.twinx()
         
         # Create bars for carbon emissions on the right axis (convert to kg like plot_budgets.py)
-        bars = ax2.bar(methods, [e/1000 for e in emissions], color=colors, alpha=0.8)
+        # Use same styling as plot_budgets.py: alpha=0.4, width=5
+        bars = ax2.bar(all_methods_for_bars, [e/1000 for e in all_emissions], color=all_colors, alpha=0.4, width=0.6)
         
         # Remove value labels on bars (commented out)
         # for bar, emission in zip(bars, emissions):
@@ -147,32 +204,95 @@ def plot_carbon_and_final_accuracy(carbon_files, budget_files, ax, collected_lin
         #     ax2.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
         #            f'{emission/1000:.1f}', ha='center', va='bottom', fontsize=20)
         
-        # Plot final accuracy as dotted line on the left axis
-        x_pos = range(len(methods))
-        line, = ax.plot(x_pos, final_accuracies, 'k--', linewidth=3, marker='o', 
-                        markersize=8, label='Final Accuracy')
+        # Plot final accuracy as black solid line on the left axis (only for non-100% methods)
+        # Use same styling as plot_budgets.py: marker='o', markersize=10, linewidth=2
+        if methods_for_accuracy and accuracies_for_line:
+            # Map accuracy line to the correct x-positions in the full bar chart
+            accuracy_x_positions = []
+            for acc_method in methods_for_accuracy:
+                if acc_method in all_methods_for_bars:
+                    accuracy_x_positions.append(all_methods_for_bars.index(acc_method))
+                else:
+                    print(f"[WARN] Method {acc_method} not found in all_methods_for_bars")
+            
+            line, = ax.plot(accuracy_x_positions, accuracies_for_line, 'k-', linewidth=2, marker='o', 
+                            markersize=10, label='Final Accuracy')
         
-        # Add accuracy value labels
-        for i, acc in enumerate(final_accuracies):
-            ax.text(i, acc + 1, f'{acc:.1f}%', ha='center', va='bottom', 
-                    fontsize=18, fontweight='bold')
+        # Add horizontal line for Oort 100% (unconstrained availability) similar to plot_budgets.py
+        # Look for Oort 100% file in budget_files to get the accuracy
+        dashed_line_for_legend = None
+        for file_path in budget_files:
+            fname = os.path.basename(file_path)
+            if fname.endswith("100%.pkl") and "carbon" not in fname:
+                try:
+                    with open(file_path, 'rb') as f:
+                        data = pickle.load(f)
+                    if hasattr(data, "metrics_centralized") and "accuracy" in data.metrics_centralized:
+                        # Get final accuracy (last entry) like plot_budgets.py
+                        acc = 100 * data.metrics_centralized["accuracy"][-1][1]
+                        ax.axhline(y=acc, color='black', linestyle='--', linewidth=1.5)
+                        # Position text at left edge like in plot_budgets.py
+                        ax.text(x=-0.4, y=acc + 0.3, s="Oort", fontsize=30, va='bottom', ha='left')
+                        # Create line object for legend
+                        import matplotlib.lines as mlines
+                        dashed_line_for_legend = mlines.Line2D([], [], color='black', linestyle='--', label='Oort')
+                        break  # Only need to add this once
+                except Exception as e:
+                    print(f"[WARN] Could not read accuracy from {fname}: {e}")
+        
+        # Add accuracy value labels (consistent for all rows)
+        for i, (x_pos, acc) in enumerate(zip(accuracy_x_positions, accuracies_for_line)):
+            ax.text(x_pos, acc - 1, f'{acc:.1f}%', ha='center', va='top', 
+                    fontsize=int(35 * 1.2))  # Updated fontsize
         
         # Format primary y-axis (accuracy) - left side
         # ax.set_ylabel("Final Accuracy (%)", fontsize=30)
-        ax.set_xlabel("Methods", fontsize=30)
+        if show_xlabel:
+            ax.set_xlabel("Methods", fontsize=int(42 * 1.2))  # Updated fontsize
         ax.grid(False)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.tick_params(axis='both', labelsize=25, width=1.5, length=6)
+        ax.tick_params(axis='both', labelsize=int(40 * 1.2), width=2, length=6)  # Updated fontsize
         # ax.tick_params(axis='x', rotation=45)  # Removed rotation
-        ax.set_ylim(55, 65)
-        ax.set_yticks([55, 60, 65])
+        
+        # Apply custom y-axis limits and ticks if provided (for second dataset)
+        if custom_ylim is not None:
+            ax.set_ylim(custom_ylim)
+        else:
+            ax.set_ylim(55, 65)
+            
+        if custom_yticks is not None:
+            ax.set_yticks(custom_yticks)
+        else:
+            ax.set_yticks([55, 60, 65])
+        
+        # Extract percentage values for x-axis labels (use all methods for bars)
+        percentage_labels = []
+        for method in all_methods_for_bars:
+            if "30%" in method:
+                percentage_labels.append("30%")
+            elif "20%" in method:
+                percentage_labels.append("20%")
+            elif "0%" in method:
+                percentage_labels.append("0%")
+            elif "100%" in method or "Oort" == method:
+                percentage_labels.append("100%")
+            else:
+                # For methods without clear percentage, use original label
+                percentage_labels.append(method)
+        
+        # Set x-tick labels to show only percentages (for all methods including 100%)
+        ax.set_xticks(range(len(all_methods_for_bars)))
+        if show_xlabel:
+            ax.set_xticklabels(percentage_labels, fontsize=40)
+        else:
+            ax.set_xticklabels([])  # Hide x-tick labels
         
         # Format secondary y-axis (carbon) - right side, similar to plot_budgets.py
-        ax2.set_ylabel("kgCO$_2$eq", fontsize=30)
+        # Y-axis label will be set as shared label in main function
         ax2.spines['top'].set_visible(False)
         ax2.spines['right'].set_visible(True)
-        ax2.tick_params(axis='y', labelsize=25, width=1.5, length=6)
+        ax2.tick_params(axis='y', labelsize=int(40 * 1.2), width=2, length=6)  # Updated fontsize
         
         # Set y-limits and formatting similar to plot_budgets.py
         from matplotlib.ticker import FuncFormatter
@@ -182,15 +302,25 @@ def plot_carbon_and_final_accuracy(carbon_files, budget_files, ax, collected_lin
         # Add the accuracy line to collected items for legend
         collected_lines.append(line)
         collected_labels.append('Final Accuracy')
+        
+        # Add the dashed line to collected items for legend if it exists
+        if dashed_line_for_legend:
+            collected_lines.append(dashed_line_for_legend)
+            collected_labels.append('Oort')
 
-def plot_accuracy_convergence(file_paths, ax, collected_lines, collected_labels):
+def plot_accuracy_convergence(file_paths, ax, collected_lines, collected_labels, show_xlabel=True, custom_ylim=None, custom_yticks=None):
     """Plot accuracy convergence over rounds"""
     MAX_ROUNDS = 100
+    # Use same colors as plot_budgets.py
     custom_colors = {
-        "Oort": "#E69F00",
-        "OortCA 30%": "#56B4E9",
+        "Oort": "gray",  # Oort 100% should always be gray
+        "OortCA": "#E69F00",  # Match plot_budgets.py
+        "OortCA 30%": "#E69F00",  
         "OortCA 0%": "#009E73", 
-        "Random": "black"
+        "OortCAWT": "cornflowerblue",  # Match plot_budgets.py
+        "OortCAWT 30%": "cornflowerblue",
+        "OortCAWT 0%": "cornflowerblue",
+        "Random": "gray"  # Changed from "black" to "gray" to match plot_budgets.py
     }
 
     for file_path in file_paths:
@@ -214,7 +344,8 @@ def plot_accuracy_convergence(file_paths, ax, collected_lines, collected_labels)
             display_label = simplify_label(base_label)
             
             color = custom_colors.get(display_label, "#333333")
-            linestyle = '--' if "random" in display_label.lower() else '-'
+            # Oort 100% should use dashed lines, Random should use dashed lines
+            linestyle = '--' if "random" in display_label.lower() or display_label == "Oort" else '-'
 
             line, = ax.plot(round_global, acc_global, label=display_label, 
                           color=color, linestyle=linestyle, linewidth=2)
@@ -226,53 +357,127 @@ def plot_accuracy_convergence(file_paths, ax, collected_lines, collected_labels)
         except Exception as e:
             print(f"Accuracy file {file_path}: {e}. Skipping...")
 
-    ax.set_xlabel("Training Rounds", fontsize=30)
-    ax.set_ylabel("Accuracy (%)", fontsize=30)
+    if show_xlabel:
+        ax.set_xlabel("Training Rounds", fontsize=42)
+    # Y-axis label will be set as shared label in main function
     ax.grid(False)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.tick_params(axis='both', labelsize=25, width=1.5, length=6)
+    ax.tick_params(axis='both', labelsize=40, width=2, length=6)
     ax.set_xticks(np.arange(0, MAX_ROUNDS + 1, step=25))
-    ax.set_yticks(np.arange(30, 72, 20))
-    ax.set_ylim(30, 72)
+    if not show_xlabel:
+        ax.set_xticklabels([])  # Hide x-tick labels
+    
+    # Set custom y-axis limits and ticks if provided, otherwise use defaults
+    if custom_ylim and custom_yticks:
+        ax.set_ylim(custom_ylim)
+        ax.set_yticks(custom_yticks)
+    else:
+        ax.set_yticks(np.arange(30, 72, 20))
+        ax.set_ylim(30, 72)
 
 def main():
     parser = argparse.ArgumentParser(description="Plot evaluation results with carbon emissions and accuracy.")
     parser.add_argument("folder", type=str, help="Path to the folder containing .pkl files.")
+    parser.add_argument("--folder2", type=str, default=None,
+                        help="Path to the second folder for additional row of plots.")
     parser.add_argument("--output_name", type=str, default="evaluation_plot",
                         help="Name of the output file (without extension).")
     args = parser.parse_args()
 
     folder_path = args.folder
+    folder2_path = args.folder2
     
-    # Load budget data (accuracy files)
+    # Determine number of rows based on whether second folder is provided
+    num_rows = 2 if folder2_path else 1
+    
+    collected_lines = []
+    collected_labels = []
+
+    fig, axes = plt.subplots(num_rows, 2, figsize=(16, 5.5 * num_rows))
+    
+    # Handle case where we have only one row (axes is 1D)
+    if num_rows == 1:
+        axes = axes.reshape(1, -1)
+
+    # Plot first folder (first row)
+    print(f"Processing first folder: {folder_path}")
     budget_files = load_budget_data(folder_path)
-    
-    # Load carbon data
     carbon_files = load_carbon_data(folder_path)
     
     print(f"Found {len(budget_files)} budget files and {len(carbon_files)} carbon files")
 
-    collected_lines = []
-    collected_labels = []
+    # Determine if this is the bottom row (show x-axis labels)
+    is_bottom_row = (num_rows == 1) or (folder2_path is None)
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 5.5))
-
-    # Plot accuracy convergence on the left (first subplot, like plot_acc.py)
+    # Plot accuracy convergence on the left (first subplot)
     if budget_files:
-        plot_accuracy_convergence(budget_files, axes[0], collected_lines, collected_labels)
+        plot_accuracy_convergence(budget_files, axes[0, 0], collected_lines, collected_labels, show_xlabel=is_bottom_row)
     else:
-        print("No budget files found")
+        print("No budget files found in first folder")
 
     # Plot carbon emissions with final accuracy on the right (second subplot)
     if carbon_files and budget_files:
-        plot_carbon_and_final_accuracy(carbon_files, budget_files, axes[1], collected_lines, collected_labels)
+        plot_carbon_and_final_accuracy(carbon_files, budget_files, axes[0, 1], collected_lines, collected_labels, show_xlabel=is_bottom_row)
     else:
-        print("No carbon or budget files found for combined plot")
+        print("No carbon or budget files found for combined plot in first folder")
 
-    # Add dataset name label on the left edge for both subplots
-    fig.text(-0.02, 0.5, "CIFAR-100", rotation=90, fontsize=30,  
-             ha='center', va='center')
+    # Add subplot label (a) in left margin for first row
+    fig.text(
+        -0.15,  # X: very close to left edge
+        axes[0, 0].get_position().y1 - 0.1,  # Y: just above top of first row
+        "(a)",
+        fontsize=42,
+        fontweight="bold",
+        ha="left",
+        va="top"
+    )
+
+    # If only one row, add shared y-axis labels here
+    if num_rows == 1:
+        y_center = 0.5
+        fig.text(-0.05, y_center, "Accuracy (%)", va='center', rotation='vertical', fontsize=42)
+        fig.text(1.02, y_center, "kgCO$_2$eq", va='center', rotation='vertical', fontsize=42)
+
+    # Plot second folder if provided (second row)
+    if folder2_path:
+        print(f"Processing second folder: {folder2_path}")
+        budget_files2 = load_budget_data(folder2_path)
+        carbon_files2 = load_carbon_data(folder2_path)
+        
+        print(f"Found {len(budget_files2)} budget files and {len(carbon_files2)} carbon files in second folder")
+
+        # Plot accuracy convergence on the left (third subplot)
+        if budget_files2:
+            plot_accuracy_convergence(budget_files2, axes[1, 0], collected_lines, collected_labels, 
+                                     show_xlabel=True,  # Second row is always bottom row
+                                     custom_ylim=(0, 70), custom_yticks=[0, 35, 70])
+        else:
+            print("No budget files found in second folder")
+
+        # Plot carbon emissions with final accuracy on the right (fourth subplot)
+        if carbon_files2 and budget_files2:
+            # Use custom y-axis limits for TinyImageNet (0-70) with 3 tick labels
+            plot_carbon_and_final_accuracy(carbon_files2, budget_files2, axes[1, 1], collected_lines, collected_labels, 
+                                          show_xlabel=True, custom_ylim=(0, 70), custom_yticks=[0, 35, 70])  # Second row is always bottom row
+        else:
+            print("No carbon or budget files found for combined plot in second folder")
+
+        # Add subplot label (b) in left margin for second row
+        fig.text(
+            -0.15,  # X: very close to left edge
+            axes[1, 0].get_position().y1 - 0.1,  # Y: just above top of second row
+            "(b)",
+            fontsize=42,
+            fontweight="bold",
+            ha="left",
+            va="top"
+        )
+
+    # Add shared y-axis labels (matching plot_budgets.py style)
+    y_center = 0.5 if num_rows == 1 else 0.5  # Center position for y-labels
+    fig.text(-0.05, y_center, "Accuracy (%)", va='center', rotation='vertical', fontsize=42)
+    fig.text(1.02, y_center, "kgCO$_2$eq", va='center', rotation='vertical', fontsize=42)
 
     # Create global legend with unique labels
     if collected_lines and collected_labels:
@@ -283,10 +488,10 @@ def main():
         
         fig.legend(unique_items.values(), unique_items.keys(),
                    loc="upper center",
-                   ncol=min(3, len(unique_items)),
-                   fontsize=25,
+                   ncol=min(2, len(unique_items)),
+                   fontsize=40,
                    frameon=False,
-                   bbox_to_anchor=(0.5, 1.12))
+                   bbox_to_anchor=(0.5, 1.25))
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     os.makedirs("plots", exist_ok=True)

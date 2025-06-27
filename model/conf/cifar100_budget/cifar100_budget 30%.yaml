@@ -9,7 +9,7 @@ alpha: 10 # for dirichlet
 # client config:
 config_fit:
   lr: 0.001
-  local_epochs: 2
+  local_epochs: 1
   weight_decay: # default = 0
 
 # server config:
