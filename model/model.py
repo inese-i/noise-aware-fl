@@ -44,6 +44,7 @@ class CIFAR100Net(nn.Module):
         return x
 
 def get_densenet121():
+    # https://docs.pytorch.org/vision/main/models/generated/torchvision.models.densenet121.html?utm_source=chatgpt.com 
     # Load the pre-trained DenseNet-121 model
     model = models.densenet121(pretrained=True)
     

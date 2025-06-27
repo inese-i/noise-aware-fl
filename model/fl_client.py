@@ -4,7 +4,7 @@ import numpy as np
 import flwr as fl
 import torch.nn.functional as F
 import torch
-from datasets import preview_cifar10, preview_tiny_imagenet
+from datasets import preview_cifar10, preview_cifar100, preview_tiny_imagenet
 
 class FlowerClient(fl.client.NumPyClient):
     def __init__(self, net, device, trainloader, valloader, cid, trainloader2=None):
@@ -30,7 +30,7 @@ class FlowerClient(fl.client.NumPyClient):
         
 
         if server_round == 1:
-            local_epochs = 3
+            local_epochs = 1
         else:
             local_epochs = config.get("local_epochs", 1) if config.get("local_epochs") is not None else 1
             
@@ -43,8 +43,8 @@ class FlowerClient(fl.client.NumPyClient):
         # if server_round == 1 and self.client_id == 1:
         #     preview_cifar10(self.trainloader)
 
-        # if server_round == 1 and self.client_id == 1:
-        #     preview_mnist(self.trainloader)
+        # if server_round == 1 and self.client_id == 1 :
+        #      preview_cifar100(self.trainloader)
 
         # if server_round == 1 and self.client_id == 1:
         #     preview_tiny_imagenet(self.trainloader)
