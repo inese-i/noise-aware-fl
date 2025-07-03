@@ -3,7 +3,7 @@ num_rounds: 100
 num_clients: 30
 num_clients_per_round: 10
 batch_size: 32
-dataset: cifar100_dirichlet # cifar100_iid
+dataset: tinyimagenet_dirichlet # cifar100_iid
 alpha: 10 # for dirichlet
 
 # client config:
