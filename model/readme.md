@@ -36,5 +36,10 @@ python plot_selection.py budget
 # Carbon Budgetting (Fig. 7) 
 python plot_budgets.py budget noisybudget 
 
+# Dditional eval (Fig. 8) 
+python plot_budget_accuracy.py tinyimagenetbudget/ noisetinyim/ cifar100budget/ noisecifar100/ --output_name final_plot --folder_names "Clean Data" "Data Noise Added" "Clean Data" "Data Noise Added"
+
+# Unused plot - Convergence and Selectiont count with average C02 intensities
+python plot_combined_new.py cifar100budget/ noisecifar100/  tinyimagenetbudget/ noisetinyim/  --second_dataset --output_name combined_visualization
 ```    
 
