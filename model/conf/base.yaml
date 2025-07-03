@@ -1,9 +1,9 @@
-name: nnoisecifar100_Oort 100% # foldername_filename
+name: noisetinyim_Oort 100% # foldername_filename
 num_rounds: 100
 num_clients: 30
 num_clients_per_round: 10
 batch_size: 32
-dataset: tinyimagenet_dirichlet # cifar100_iid
+dataset: cifar100_dirichlet # cifar100_iid
 alpha: 10 # for dirichlet
 
 # client config:
@@ -19,7 +19,7 @@ threshold_coeff:
 carbon_intensities: True
 add_curtailment_data: True
 carbon_budget: True
-total_carbon_budget: 500000000000000000
+total_carbon_budget: 5000000000000000000
 experiments:
   # corrupted clients
   start_round: 0
